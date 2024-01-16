@@ -50,11 +50,11 @@ class PostBaseSchema(BaseModel):
     class Config:
         orm_mode = True
         allow_population_by_field_name = True
-        arbitary_types_allowed = True
+        arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
 class CreatePostSchema(PostBaseSchema):
-    user: ObjectId 
+    user: Union[ObjectId , None]
     
 class PostResponse(PostBaseSchema):
     id: str

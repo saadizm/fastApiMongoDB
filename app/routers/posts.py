@@ -44,6 +44,53 @@ async def create_post(post: schemas.CreatePostSchema, user_id: str = Depends(req
         new_post = postListEntity(Post.aggregate(pipeline))[0]
         return new_post
     except DuplicateKeyError:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                        detail=f"Post with title: "{post.title}"already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, 
+                            detail=f"Post with title: "{post.title} "already exists")
+
+
+@router.put("/{id}")
+async def update_post(id: str, payload: schemas.UpdatePostSchema, user_id: str = Depends(require_user)):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Invalid id: {id}")
+    updated_post = Post.find_one_and_update(
+        {'_id': ObjectId(id)}, {'$set': payload.dict(exclude_none=True)}, return_document=ReturnDocument.AFTER)
+    if not updated_post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f'No post with this id: {id} found')
+    return postEntity(updated_post)
+
+@router.get("/{id}")
+async def get_post(id: str, user_id: str =  Depends(require_user)):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Invalid id: {id}")
+    
+    pipeline = [
+        {"$match" : {"_id": ObjectId(id)}},
+        {"$lookup": {"from":"users", "localField":"user",
+                "foreignField":"_id", "as":"user"}},
+        {"$unwind": "$user"},
+    ]
+    
+    db_cursor = Post.aggregate(pipeline)
+    results = list(db_cursor)
+    
+    if len(results) == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"No post with this id {id} found")
+        
+    post = postListEntity(results)[0]
+    return post
+    
+@router.delete("/{id}")
+async def delete_post(id: str, user_id: str = Depends(require_user)):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Invalid id: {id}")
+    post = Post.find_one_and_delete({"_id": ObjectId(id)})
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"No post with this id {id} found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
     
